@@ -1,0 +1,92 @@
+import sqlite3
+
+class Pessoa:
+    def __init__(self, nome):
+        self.nome = nome
+
+class Arvore:
+    def __init__(self, especie, local):
+        self.especie = especie
+        self.local = local
+
+class Registro:
+    def __init__(self, pessoa, arvore, quantidade_a_plantar):
+        self.pessoa = pessoa
+        self.arvore = arvore
+        self.quantidade_a_plantar = quantidade_a_plantar
+
+def conectar_banco_de_dados():
+    conn = sqlite3.connect('registro_de_cortes.db')
+    return conn
+
+def criar_tabelas(conn):
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pessoas (
+            id INTEGER PRIMARY KEY,
+            nome TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS arvores (
+            id INTEGER PRIMARY KEY,
+            especie TEXT NOT NULL,
+            local TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS registros (
+            id INTEGER PRIMARY KEY,
+            pessoa_id INTEGER NOT NULL,
+            arvore_id INTEGER NOT NULL,
+            quantidade_a_plantar INTEGER NOT NULL,
+            FOREIGN KEY (pessoa_id) REFERENCES pessoas (id),
+            FOREIGN KEY (arvore_id) REFERENCES arvores (id)
+        )
+    ''')
+    conn.commit()
+
+def cadastrar_pessoa(conn, nome):
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO pessoas (nome) VALUES (?)', (nome,))
+    conn.commit()
+    return cursor.lastrowid
+
+def cadastrar_arvore(conn, especie, local):
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO arvores (especie, local) VALUES (?, ?)', (especie, local))
+    conn.commit()
+    return cursor.lastrowid
+
+def registrar_corte_de_arvore(conn, pessoa_id, arvore_id, quantidade_a_plantar):
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO registros (pessoa_id, arvore_id, quantidade_a_plantar) VALUES (?, ?, ?)', (pessoa_id, arvore_id, quantidade_a_plantar))
+    conn.commit()
+
+def imprimir_registro_de_pessoa(conn, pessoa_id):
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT p.nome, a.especie, a.local, r.quantidade_a_plantar
+        FROM pessoas p
+        JOIN registros r ON p.id = r.pessoa_id
+        JOIN arvores a ON r.arvore_id = a.id
+        WHERE p.id = ?
+    ''', (pessoa_id,))
+    rows = cursor.fetchall()
+    print(f"Nome: {rows[0][0]}")
+    print("Árvores a cortar:")
+    for row in rows:
+        print(f"- {row[1]} em {row[2]} (deve plantar {row[3]} árvores no lugar)")
+
+# Example usage:
+conn = conectar_banco_de_dados()
+criar_tabelas(conn)
+
+pessoa_id = cadastrar_pessoa(conn, "João")
+arvore_id1 = cadastrar_arvore(conn, "Eucalipto", "Praça da Cidade")
+arvore_id2 = cadastrar_arvore(conn, "Ipê", "Parque da Paz")
+
+registrar_corte_de_arvore(conn, pessoa_id, arvore_id1, 3)
+registrar_corte_de_arvore(conn, pessoa_id, arvore_id2, 2)
+
+imprimir_registro_de_pessoa(conn, pessoa_id)
